@@ -84,7 +84,8 @@ void render(uint8_t img[WIDTH][HEIGHT]) {
             // int out = 0 <= img[i][j] && img[i][j] <= 255 ? 0 : 1;
             int out = img[i][j] == 128;
             if (out) {
-                printf("%d %d %d ", 255, 0, 0);
+                // printf("%d %d %d ", 255, 0, 0);
+                printf("%d %d %d ", img[i][j], img[i][j], img[i][j]);
                 fprintf(stderr, "hello %d %d\n", i, j);
             } else {
                 printf("%d %d %d ", img[i][j], img[i][j], img[i][j]);
@@ -337,6 +338,7 @@ int ppm_load(char* filename, uint8_t img[WIDTH][HEIGHT]) {
 
     // 释放分配的内存
     // free(buffer);
+    return 0;
 }
 
 int main() {
@@ -353,7 +355,7 @@ int main() {
     binarize(img);
     // error when  c.radius == 0
     Circle c = color_img(img);
-    draw_circle(img, c);
-    render(img);
+    draw_circle(ori, c);
+    render(ori);
     return 0;
 }
