@@ -346,7 +346,7 @@ int ppm_load(char* filename, uint8_t img[WIDTH][HEIGHT]) {
 int main() {
     // uint8_t* image = malloc(WIDTH * HEIGHT * sizeof(uint8_t));
     srand(time(0));
-    static uint8_t ori[WIDTH][HEIGHT];
+    static uint8_t ori[WIDTH][HEIGHT] = { 0 };
     static uint8_t img[WIDTH][HEIGHT];
     fprintf(stderr, "Rendering image...\n");
     // rand_img(ori);
