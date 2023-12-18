@@ -9,19 +9,20 @@ enum {
     HEIGHT = 120,
     BINARY_THRESHOLD = 180,
     EDGE_THRESHOLD = 255,
+    LINE_BUF_SIZE = 256,
 };
 
 static uint8_t buf1[WIDTH][HEIGHT];
 static uint8_t buf2[WIDTH][HEIGHT];
-static int int_buf[WIDTH * HEIGHT];
+static uint8_t line_buf[LINE_BUF_SIZE];
 static uint8_t queue[WIDTH * HEIGHT][2];
 
 typedef struct {
-    int x, y;
+    uint8_t x, y;
 } Point;
 
 typedef struct {
-    int cx, cy, radius;
+    uint8_t cx, cy, radius;
 } Circle;
 
 typedef struct {
@@ -149,13 +150,13 @@ void bfs_depth(uint8_t img[WIDTH][HEIGHT], int color[WIDTH][HEIGHT]) {
 Circle color_img(uint8_t img[WIDTH][HEIGHT]) {
     static int color_cnt = 0;
     memset(buf1, 0, sizeof(buf1));
-    memset(int_buf, 0, sizeof(int_buf));
+    memset(line_buf, 0, sizeof(line_buf));
 
     const int dx[] = { 0, 0, 1, -1 };
     const int dy[] = { 1, -1, 0, 0 };
 
     uint8_t(*color)[HEIGHT] = buf1;
-    int* color_area = int_buf;
+    uint8_t* color_area = line_buf;
     color_cnt = 0;
 
     int head = 0, tail = -1;
@@ -247,6 +248,7 @@ Circle color_img(uint8_t img[WIDTH][HEIGHT]) {
             int tx = x + dx[k];
             int ty = y + dy[k];
             // calculate dis
+            // 可能会减到 255
             if (tx >= 0 && tx < WIDTH && ty >= 0 && ty < HEIGHT && color[tx][ty] == max_area_color
                 && dis[x][y] + 1 < dis[tx][ty])
             {
@@ -355,6 +357,10 @@ int main() {
     binarize(img);
     // error when  c.radius == 0
     Circle c = color_img(img);
+    if (c.radius == 0) {
+        fprintf(stderr, "No Circle found.");
+        return 0;
+    }
     draw_circle(ori, c);
     render(ori);
     return 0;
