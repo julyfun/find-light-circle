@@ -20,6 +20,11 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
+const int BINARY_THRESHOLD = 180;
+const uint8_t ZIG = 0xAA;
+const float IOU_BY_BEST = 0.88886666;
+const float IOU_NEEDED = 0.75;
+
 #if !__APPLE__
 Circle circle;
 uint8_t cv_fps;
@@ -33,8 +38,8 @@ void draw_circle(uint8_t img[HEIGHT][WIDTH], Circle c) {
             int dy = j - c.cy;
             int d = dx * dx + dy * dy;
             int r_sq = c.radius * c.radius;
-            if (r_sq - 20 <= d && d <= r_sq + 20) {
-                img[j][i] = 128;
+            if (r_sq - 2 * c.radius <= d && d <= r_sq + 2 * c.radius) {
+                img[j][i] = ZIG;
                 // fprintf(stderr, "no %d %d\n", i, j);
             }
         }
@@ -46,7 +51,7 @@ void render(uint8_t img[HEIGHT][WIDTH]) {
     for (int j = 0; j < HEIGHT; ++j) {
         for (int i = 0; i < WIDTH; ++i) {
             // int out = 0 <= img[i][j] && img[i][j] <= 255 ? 0 : 1;
-            int out = img[j][i] == 128;
+            int out = img[j][i] == ZIG;
             int pix = img[j][i];
             if (out) {
                 // printf("%d %d %d ", 255, 0, 0);
@@ -255,6 +260,16 @@ OptionCircle color_img(uint8_t img[HEIGHT][WIDTH]) {
             best_iou = area_iou[i];
         }
     }
+    for (int i = 1; i <= color_cnt; i++) {
+        fprintf(stderr, "area_iou[%d]: %.2f\n", i, area_iou[i]);
+    }
+    fprintf(stderr, "best_iou: %.2f\n", best_iou);
+    // [iou 均太差，退出]
+    if (best_iou < IOU_NEEDED) {
+        return (OptionCircle) {
+            .some = 0,
+        };
+    }
     // [至少要在最佳的 xx% 以上]
     float max_area = 0;
     int best_idx = -1;
@@ -262,8 +277,7 @@ OptionCircle color_img(uint8_t img[HEIGHT][WIDTH]) {
         0, 0, 0,
     };
     for (int i = 1; i <= color_cnt; i++) {
-        fprintf(stderr, "area_iou[%d]: %.2f %.2f\n", i, area_iou[i], area_iou[i] / best_iou);
-        if (area_iou[i] >= best_iou * 0.88886666) {
+        if (area_iou[i] >= best_iou * IOU_BY_BEST) {
             if (color_area[i] > max_area) {
                 max_area = color_area[i];
                 best_circle = circles[i];
@@ -353,8 +367,8 @@ int main(int argc, char* argv[]) {
     static uint8_t ori[HEIGHT][WIDTH] = { 0 };
     static uint8_t img[HEIGHT][WIDTH];
     fprintf(stderr, "Rendering image...\n");
-    // rand_img(ori, 40);
-    ppm_load(argv[1], ori);
+    rand_img(ori, 40);
+    // ppm_load(argv[1], ori);
     memcpy(img, ori, sizeof(img));
     // https://blog.csdn.net/yy197696/article/details/110103000
     // gauss_filter(img);
