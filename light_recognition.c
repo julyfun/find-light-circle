@@ -12,7 +12,9 @@
 
 #include "light_recognition.h"
 
+#include <stdio.h>
 #include <stdint.h>
+#include <assert.h>
 #include <math.h>
 
 #include "missile.h"
@@ -30,16 +32,20 @@ Circle circle;
 uint8_t cv_fps;
 #endif
 
+static uint8_t buf1[HEIGHT][WIDTH]; // size 188 * 120 * 1 = 22560B = 22.5KB
+static uint8_t buf2[HEIGHT][WIDTH]; // 22.5KB
+static uint16_t line_buf[LINE_BUF_SIZE]; // 256 * 2 = 1KB
+static uint8_t queue[WIDTH * HEIGHT][2]; // 188 * 120 * 2 * 1 = 45120B = 44KB
 #if __APPLE__
 void draw_circle(uint8_t img[HEIGHT][WIDTH], Circle c) {
-    for (int i = 0; i < WIDTH; ++i) {
-        for (int j = 0; j < HEIGHT; j++) {
+    for (int i = 0; i < HEIGHT; ++i) {
+        for (int j = 0; j < WIDTH; j++) {
             int dx = i - c.cx;
             int dy = j - c.cy;
             int d = dx * dx + dy * dy;
             int r_sq = c.radius * c.radius;
             if (r_sq - 2 * c.radius <= d && d <= r_sq + 2 * c.radius) {
-                img[j][i] = ZIG;
+                img[i][j] = ZIG;
                 // fprintf(stderr, "no %d %d\n", i, j);
             }
         }
@@ -65,7 +71,7 @@ void render(uint8_t img[HEIGHT][WIDTH]) {
     }
 }
 
-void rand_img(uint8_t img[HEIGHT][WIDTH], int n) {
+void rand_img(uint8_t img[HEIGHT][WIDTH], int n, int r) {
     for (int j = 0; j < HEIGHT; j++) {
         for (int i = 0; i < WIDTH; ++i) {
             img[j][i] = 0;
@@ -74,7 +80,7 @@ void rand_img(uint8_t img[HEIGHT][WIDTH], int n) {
     for (int i = 0; i < n; i++) {
         int x = rand() % HEIGHT;
         int y = rand() % WIDTH;
-        int radius = rand() % 15 + 5;
+        int radius = rand() % r + 1;
         for (int j = MAX(0, x - radius); j < MIN(HEIGHT, x + radius); j++) {
             for (int k = MAX(0, y - radius); k < MIN(WIDTH, y + radius); k++) {
                 if ((j - x) * (j - x) + (k - y) * (k - y) <= radius * radius) {
@@ -103,6 +109,7 @@ typedef struct OptionCircleInner OptionCircle;
 OptionCircle color_img(uint8_t img[HEIGHT][WIDTH]) {
     const int dx[] = { 0, 0, 1, -1 };
     const int dy[] = { 1, -1, 0, 0 };
+    fprintf(stderr, "---\n");
 
     // <buf1 borrowed>
     // <line_buf borrowed>
@@ -146,7 +153,7 @@ OptionCircle color_img(uint8_t img[HEIGHT][WIDTH]) {
     // [bfs 求外部距离]
     // <buf2 borrowed>
     head = 0, tail = -1;
-    memset(buf2, 127, sizeof(buf2));
+    memset(buf2, 0, sizeof(buf2));
     uint8_t(*outer_dis)[WIDTH] = buf2;
     for (int i = 0; i < HEIGHT; i++) {
         for (int j = 0; j < WIDTH; j++) {
@@ -222,8 +229,8 @@ OptionCircle color_img(uint8_t img[HEIGHT][WIDTH]) {
     memset(circles, 0, sizeof(circles));
     for (int i = 1; i <= color_cnt; i++) { // 0 也求
         circles[i] = (Circle) {
-            .cx = mass_center[i][1],
-            .cy = mass_center[i][0],
+            .cx = mass_center[i][0],
+            .cy = mass_center[i][1],
             .radius = sqrt(ave_r2[i]),
         };
     }
@@ -263,9 +270,9 @@ OptionCircle color_img(uint8_t img[HEIGHT][WIDTH]) {
         }
     }
     for (int i = 1; i <= color_cnt; i++) {
-        fprintf(stderr, "area_iou[%d]: %.2f\n", i, area_iou[i]);
+        fprintf(stderr, "area_iou[%d]: %.3f\n", i, area_iou[i]);
     }
-    fprintf(stderr, "best_iou: %.2f\n", best_iou);
+    fprintf(stderr, "best_iou: %.3f\n", best_iou);
     // [iou 均太差，退出]
     if (best_iou < IOU_NEEDED) {
         return (OptionCircle) {
@@ -297,6 +304,9 @@ OptionCircle color_img(uint8_t img[HEIGHT][WIDTH]) {
         .some = 1,
         .circle = best_circle,
     };
+    // <line_buf returned>
+    // <buf1 returned>
+    // <buf2 returned>
 }
 
 // 从文件读取PPM图片
@@ -367,16 +377,32 @@ int main(int argc, char* argv[]) {
     // uint8_t* image = malloc(WIDTH * HEIGHT * sizeof(uint8_t));
     srand(time(0));
     static uint8_t ori[HEIGHT][WIDTH] = { 0 };
+    static uint8_t chaos[HEIGHT][WIDTH];
     static uint8_t img[HEIGHT][WIDTH];
+
+    OptionCircle res;
     fprintf(stderr, "Rendering image...\n");
-    rand_img(ori, 40);
-    // ppm_load(argv[1], ori);
+    rand_img(ori, 1, 40);
     memcpy(img, ori, sizeof(img));
+    binarize(img);
+    res = color_img(img);
+    for (int i = 1; i <= 100; i++) {
+        rand_img(chaos, rand() % 3, rand() % 50 + 5);
+        memcpy(img, chaos, sizeof(img));
+        binarize(img);
+        res = color_img(img); // 搅乱静态数组
+        if (res.some == 1 && res.circle.radius == 0) {
+            assert(0);
+        }
+
+    }
+    // ppm_load(argv[1], ori);
+
     // https://blog.csdn.net/yy197696/article/details/110103000
     // gauss_filter(img);
+    memcpy(img, ori, sizeof(img));
     binarize(img);
-    // error when  c.radius == 0
-    OptionCircle res = color_img(img);
+    res = color_img(img);
     if (res.some == 0) {
         fprintf(stderr, "No Circle found.");
         return 0;

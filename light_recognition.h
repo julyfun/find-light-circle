@@ -26,11 +26,6 @@ extern "C" {
 #include <time.h>
 #include "missile.h"
 
-static uint8_t buf1[HEIGHT][WIDTH];
-static uint8_t buf2[HEIGHT][WIDTH];
-static uint16_t line_buf[LINE_BUF_SIZE];
-static uint8_t queue[WIDTH * HEIGHT][2];
-
 typedef struct {
     int x, y;
 } Point;
