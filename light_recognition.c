@@ -17,6 +17,9 @@
 
 #include "missile.h"
 
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+
 #if !__APPLE__
 Circle circle;
 uint8_t cv_fps;
@@ -47,13 +50,33 @@ void render(uint8_t img[HEIGHT][WIDTH]) {
             int pix = img[j][i];
             if (out) {
                 // printf("%d %d %d ", 255, 0, 0);
-                printf("%d %d %d ", pix, pix, pix);
+                printf("%d %d %d ", 255, pix, pix);
                 // fprintf(stderr, "hello %d %d\n", i, j);
             } else {
                 printf("%d %d %d ", pix, pix, pix);
             }
         }
         printf("\n");
+    }
+}
+
+void rand_img(uint8_t img[HEIGHT][WIDTH], int n) {
+    for (int j = 0; j < HEIGHT; j++) {
+        for (int i = 0; i < WIDTH; ++i) {
+            img[j][i] = 0;
+        }
+    }
+    for (int i = 0; i < n; i++) {
+        int x = rand() % HEIGHT;
+        int y = rand() % WIDTH;
+        int radius = rand() % 15 + 5;
+        for (int j = MAX(0, x - radius); j < MIN(HEIGHT, x + radius); j++) {
+            for (int k = MAX(0, y - radius); k < MIN(WIDTH, y + radius); k++) {
+                if ((j - x) * (j - x) + (k - y) * (k - y) <= radius * radius) {
+                    img[j][k] = 255;
+                }
+            }
+        }
     }
 }
 #endif
@@ -66,7 +89,13 @@ void binarize(uint8_t img[HEIGHT][WIDTH]) {
     }
 }
 
-Circle color_img(uint8_t img[HEIGHT][WIDTH]) {
+struct OptionCircleInner {
+    uint8_t some;
+    Circle circle;
+};
+typedef struct OptionCircleInner OptionCircle;
+
+OptionCircle color_img(uint8_t img[HEIGHT][WIDTH]) {
     const int dx[] = { 0, 0, 1, -1 };
     const int dy[] = { 1, -1, 0, 0 };
 
@@ -79,8 +108,8 @@ Circle color_img(uint8_t img[HEIGHT][WIDTH]) {
     int color_cnt = 0;
     // [找连通块，染色]
     int head = 0, tail = -1;
-    for (int j = 0; j < WIDTH && color_cnt + 1 < LINE_BUF_SIZE; j++) {
-        for (int i = 0; i < HEIGHT && color_cnt + 1 < LINE_BUF_SIZE; i++) { // 不能双重 break 无语
+    for (int i = 0; i < HEIGHT && color_cnt + 1 < LINE_BUF_SIZE; i++) { // 不能双重 break 无语
+        for (int j = 0; j < WIDTH && color_cnt + 1 < LINE_BUF_SIZE; j++) {
             if (color[i][j] == 0 && img[i][j] == 255) {
                 color_cnt++;
                 queue[++tail][0] = i;
@@ -228,19 +257,30 @@ Circle color_img(uint8_t img[HEIGHT][WIDTH]) {
     }
     // [至少要在最佳的 xx% 以上]
     float max_area = 0;
+    int best_idx = -1;
     Circle best_circle = (Circle) {
         0, 0, 0,
     };
     for (int i = 1; i <= color_cnt; i++) {
-        if (area_iou[i] >= best_iou * 0.928888) {
+        fprintf(stderr, "area_iou[%d]: %.2f %.2f\n", i, area_iou[i], area_iou[i] / best_iou);
+        if (area_iou[i] >= best_iou * 0.88886666) {
             if (color_area[i] > max_area) {
                 max_area = color_area[i];
                 best_circle = circles[i];
+                best_idx = i;
             }
         }
     }
     
-    return best_circle;
+    if (best_idx == -1) {
+        return (OptionCircle) {
+            .some = 0,
+        };
+    }
+    return (OptionCircle) {
+        .some = 1,
+        .circle = best_circle,
+    };
 }
 
 // 从文件读取PPM图片
@@ -313,18 +353,19 @@ int main(int argc, char* argv[]) {
     static uint8_t ori[HEIGHT][WIDTH] = { 0 };
     static uint8_t img[HEIGHT][WIDTH];
     fprintf(stderr, "Rendering image...\n");
-    // rand_img(ori);
-    ppm_load(argv[1], ori);
+    rand_img(ori, 10);
+    // ppm_load(argv[1], ori);
     memcpy(img, ori, sizeof(img));
     // https://blog.csdn.net/yy197696/article/details/110103000
     // gauss_filter(img);
     binarize(img);
     // error when  c.radius == 0
-    Circle c = color_img(img);
-    if (c.radius == 0) {
+    OptionCircle res = color_img(img);
+    if (res.some == 0) {
         fprintf(stderr, "No Circle found.");
         return 0;
     }
+    Circle c = res.circle;
     draw_circle(ori, c);
     render(ori);
     fprintf(stderr, "Done\n");

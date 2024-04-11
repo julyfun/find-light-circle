@@ -36,7 +36,7 @@ typedef struct {
 } Point;
 
 typedef struct {
-    int cx, cy, radius;
+    float cx, cy, radius;
 } Circle;
 
 void cvHandle(void);
