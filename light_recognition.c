@@ -24,8 +24,9 @@
 
 const int BINARY_THRESHOLD = 180;
 const uint8_t ZIG = 0xAA;
-const float IOU_BY_BEST = 0.88886666;
-const float IOU_NEEDED = 0.75;
+const float IOU_BY_BEST_MIN_REQUIRED = 0.88886666;
+const float IOU_MIN_REQUIRED = 0.80;
+const float RADIUS_MIN_REQUIRED = 5;
 
 #if !__APPLE__
 Circle circle;
@@ -158,13 +159,17 @@ OptionCircle color_img(uint8_t img[HEIGHT][WIDTH]) {
     for (int i = 0; i < HEIGHT; i++) {
         for (int j = 0; j < WIDTH; j++) {
             // 边缘和无 color 处（注意不是 img = 0）距离为 0
-            if (color[i][j] == 0 || i == 0 || i == HEIGHT - 1 || j == 0 || j == WIDTH - 1) {
+            if (color[i][j] == 0) {
                 outer_dis[i][j] = 0;
                 queue[++tail][0] = i;
                 queue[tail][1] = j;
             }
             else {
-                outer_dis[i][j] = UINT8_MAX; // <warn>
+                if (i == 0 || i == HEIGHT - 1 || j == 0 || j == WIDTH - 1) {
+                    outer_dis[i][j] = 1; // 边缘处白色距离为 1
+                } else {
+                    outer_dis[i][j] = UINT8_MAX; // <warn>
+                }
             }
         }
     }  
@@ -217,9 +222,13 @@ OptionCircle color_img(uint8_t img[HEIGHT][WIDTH]) {
             }
         }
     }
+    // [检测是否有 0 边缘]
     for (int i = 1; i <= color_cnt; i++) {
         if (ave_r2_cnt[i] == 0) {
-            continue;
+            render(img);
+            fprintf(stderr, "ave_r2_cnt[%d] == 0\n", i);
+            fprintf(stderr, "color_area[%d]: %d\n", i, color_area[i]);
+            assert(0);
         }
         ave_r2[i] /= ave_r2_cnt[i];
     }
@@ -246,7 +255,6 @@ OptionCircle color_img(uint8_t img[HEIGHT][WIDTH]) {
     for (int i = 1; i <= color_cnt; i++) {
         area_union[i] = M_PI * ave_r2[i]; // 这里 ave_r2 精度高点
     }
-    float best_iou = 0;
     for (int i = 0; i < HEIGHT; i++) {
         for (int j = 0; j < WIDTH; j++) {
             if (color[i][j] == 0) {
@@ -262,19 +270,39 @@ OptionCircle color_img(uint8_t img[HEIGHT][WIDTH]) {
             }
         }
     }
-    // [处理 iou]
+    
+    static uint8_t valid[LINE_BUF_SIZE];
+    memset(valid, 1, sizeof(valid));
+    
+    // [过滤掉太小的圆，因为他们容易成为最优解]
     for (int i = 1; i <= color_cnt; i++) {
+        if (circles[i].radius < RADIUS_MIN_REQUIRED) {
+            valid[i] = 0; // 因为太小了
+        }
+    }
+
+    // [iou 计算，求最大的]
+    float best_iou = 0;
+    for (int i = 1; i <= color_cnt; i++) {
+        if (!valid[i]) {
+            continue;
+        }
         area_iou[i] /= area_union[i];
         if (area_iou[i] > best_iou) {
             best_iou = area_iou[i];
         }
     }
+    
+    // [输出 iou]
     for (int i = 1; i <= color_cnt; i++) {
+        if (!valid[i]) {
+            continue;
+        }
         fprintf(stderr, "area_iou[%d]: %.3f\n", i, area_iou[i]);
     }
     fprintf(stderr, "best_iou: %.3f\n", best_iou);
     // [iou 均太差，退出]
-    if (best_iou < IOU_NEEDED) {
+    if (best_iou < IOU_MIN_REQUIRED) {
         return (OptionCircle) {
             .some = 0,
         };
@@ -286,12 +314,17 @@ OptionCircle color_img(uint8_t img[HEIGHT][WIDTH]) {
         0, 0, 0,
     };
     for (int i = 1; i <= color_cnt; i++) {
-        if (area_iou[i] >= best_iou * IOU_BY_BEST) {
-            if (color_area[i] > max_area) {
-                max_area = color_area[i];
-                best_circle = circles[i];
-                best_idx = i;
-            }
+        if (!valid[i]) {
+            continue;
+        }
+        if (area_iou[i] < best_iou * IOU_BY_BEST_MIN_REQUIRED) {
+            valid[i] = 0; // 因为不像圆
+            continue;
+        }
+        if (color_area[i] > max_area) {
+            max_area = color_area[i];
+            best_circle = circles[i];
+            best_idx = i;
         }
     }
     
@@ -382,7 +415,8 @@ int main(int argc, char* argv[]) {
 
     OptionCircle res;
     fprintf(stderr, "Rendering image...\n");
-    rand_img(ori, 1, 40);
+    rand_img(ori, 5, 40);
+    // ppm_load(argv[1], ori);
     memcpy(img, ori, sizeof(img));
     binarize(img);
     res = color_img(img);
@@ -396,7 +430,6 @@ int main(int argc, char* argv[]) {
         }
 
     }
-    // ppm_load(argv[1], ori);
 
     // https://blog.csdn.net/yy197696/article/details/110103000
     // gauss_filter(img);
@@ -404,6 +437,7 @@ int main(int argc, char* argv[]) {
     binarize(img);
     res = color_img(img);
     if (res.some == 0) {
+        render(ori);
         fprintf(stderr, "No Circle found.");
         return 0;
     }
