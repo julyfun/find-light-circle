@@ -353,8 +353,8 @@ int main(int argc, char* argv[]) {
     static uint8_t ori[HEIGHT][WIDTH] = { 0 };
     static uint8_t img[HEIGHT][WIDTH];
     fprintf(stderr, "Rendering image...\n");
-    rand_img(ori, 10);
-    // ppm_load(argv[1], ori);
+    // rand_img(ori, 40);
+    ppm_load(argv[1], ori);
     memcpy(img, ori, sizeof(img));
     // https://blog.csdn.net/yy197696/article/details/110103000
     // gauss_filter(img);
@@ -378,6 +378,11 @@ void cvHandle(void) {
     static uint32_t last_tick;
     binarize(cv_image);
     circle = color_img(cv_image);
+    // 大概这样写：
+    // 先接收一个结果结构体，判断是否找到了圆
+    // OptionCircle res = color_img(cv_image);
+    // if (res.some == 0) { 没找到圆，错误处理 }
+    // else { circle = res.circle; }
     cv_fps = 1000 / (HAL_GetTick() - last_tick);
     last_tick = HAL_GetTick();
 }
