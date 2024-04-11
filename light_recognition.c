@@ -19,11 +19,11 @@
 
 #include "missile.h"
 
+const uint8_t ZIG = 0xAA;
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 const int BINARY_THRESHOLD = 180;
-const uint8_t ZIG = 0xAA;
 const float IOU_BY_BEST_MIN_REQUIRED = 0.88886666;
 const float IOU_MIN_REQUIRED = 0.80;
 const float RADIUS_MIN_REQUIRED = 5;
