@@ -58,13 +58,6 @@ void render(uint8_t img[HEIGHT][WIDTH]) {
 }
 #endif
 
-float normalized_ratio(float x) {
-    if (x > 1.0f) {
-        return 1.0f / x;
-    }
-    return x;
-}
-
 void binarize(uint8_t img[HEIGHT][WIDTH]) {
     for (uint8_t i = 0; i < HEIGHT; i++) {
         for (uint8_t j = 0; j < WIDTH; j++) {
@@ -116,7 +109,7 @@ Circle color_img(uint8_t img[HEIGHT][WIDTH]) {
         }
     }
 
-    // [bfs 求距离]
+    // [bfs 求外部距离]
     // <buf2 borrowed>
     head = 0, tail = -1;
     memset(buf2, 127, sizeof(buf2));
@@ -135,7 +128,6 @@ Circle color_img(uint8_t img[HEIGHT][WIDTH]) {
         }
     }  
     // render(dis);
-    // [bfs 求距离边缘] 
     while (head <= tail) {
         int x = queue[head][0];
         int y = queue[head][1];
