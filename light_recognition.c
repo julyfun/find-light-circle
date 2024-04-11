@@ -196,7 +196,7 @@ OptionCircle color_img(uint8_t img[HEIGHT][WIDTH]) {
         mass_center[i][1] /= color_area[i];
     }
     // [求外接半径]
-    static float ave_r2[LINE_BUF_SIZE];
+    static float ave_r2[LINE_BUF_SIZE]; // takes 1KB static memory
     static uint16_t ave_r2_cnt[LINE_BUF_SIZE];
     memset(ave_r2, 0, sizeof(ave_r2));
     memset(ave_r2_cnt, 0, sizeof(ave_r2_cnt));
@@ -233,7 +233,9 @@ OptionCircle color_img(uint8_t img[HEIGHT][WIDTH]) {
     
     // [求圆和整个连通块的 iou]
     static float area_iou[LINE_BUF_SIZE];
+    memset(area_iou, 0, sizeof(area_iou));
     static float area_union[LINE_BUF_SIZE];
+    memset(area_union, 0, sizeof(area_union));
     for (int i = 1; i <= color_cnt; i++) {
         area_union[i] = M_PI * ave_r2[i]; // 这里 ave_r2 精度高点
     }
